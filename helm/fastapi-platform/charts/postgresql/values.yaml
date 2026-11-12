@@ -1,0 +1,59 @@
+
+replicaCount: 1
+
+image:
+  repository: postgres
+  tag: "16"
+  pullPolicy: IfNotPresent
+
+service:
+  name: postgres-service
+
+database:
+    name: postgres
+    user: Sakthivel_P
+    password: root
+    userDatabase: user_db
+    orderDatabase: order_db
+
+secret:
+  name: postgres-secret
+  usernameKey: POSTGRES_USER
+  passwordKey: POSTGRES_PASSWORD
+  userDatabaseKey: USER_DB_NAME
+  orderDatabaseKey: ORDER_DB_NAME
+
+
+initConfig:
+  name: postgres-init-config
+  mountPath: /config
+
+storage:
+  claimName: postgres-pvc
+  mountPath: /var/lib/postgresql/data
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+
+initScripts:
+  mountPath: /init-scripts
+  containerMountPath: /docker-entrypoint-initdb.d
+
+initContainer:
+  image: busybox:1.36
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+readinessProbe:
+  initialDelaySeconds: 10
+  periodSeconds: 5
+
+livenessProbe:
+  initialDelaySeconds: 30
+  periodSeconds: 10

@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: StatefulSet
+
+metadata:
+  name: postgres
+  namespace: fastapi-app
+
+spec:
+  serviceName: postgres-service
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: postgres
+
+  template:
+    metadata:
+      labels:
+        app: postgres
+
+    spec:
+      
+      initContainers:
+
+        - name: copy-init-sql
+
+          image: busybox:1.36
+
+          command:
+            - sh
+            - -c
+            - |
+              echo "Copying SQL initialization file..."
+              cp /config/init.sql /init-scripts/init.sql
+              echo "SQL file copied successfully"
+
+          volumeMounts:
+
+            # Read SQL from ConfigMap
+            - name: init-config
+              mountPath: /config
+              readOnly: true
+
+            # Write SQL into shared volume
+            - name: init-scripts
+              mountPath: /init-scripts
+      containers:
+        - name: postgres
+          image: postgres:16
+
+          ports:
+            - containerPort: 5432
+              name: postgres
+
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+
+            - name: POSTGRES_DB
+              value: postgres
+
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - Sakthivel_P
+                - -d
+                - postgres
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - Sakthivel_P
+                - -d
+                - postgres
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+        - name: init-config
+          configMap:
+            name: postgres-init-config
+
+        - name: init-scripts
+          emptyDir: {}

@@ -1,0 +1,12 @@
+dependencies:
+- name: user-service
+  repository: file://charts/user-service
+  version: 0.1.0
+- name: order-service
+  repository: file://charts/order-service
+  version: 0.1.0
+- name: postgresql
+  repository: file://charts/postgresql
+  version: 0.1.0
+digest: sha256:2981124684d02a9d831d57207afa50852949d6cd7da4fafb2a5c31c8ca72b593
+generated: "2026-11-06T13:34:52.0874+05:30"

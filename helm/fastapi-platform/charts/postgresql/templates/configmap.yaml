@@ -1,0 +1,17 @@
+{{- if .Values.init.enabled }}
+
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: {{ .Values.initConfig.name }}
+  namespace: {{ .Release.Namespace }}
+
+data:
+  init.sql: |
+    CREATE DATABASE user_db;
+    CREATE DATABASE order_db;
+
+{{- end }}
+
+

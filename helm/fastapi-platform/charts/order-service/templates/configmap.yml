@@ -1,0 +1,12 @@
+
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: {{ .Values.configMap.name }}
+
+data:
+  DATABASE_HOST: {{ .Values.configMap.data.DATABASE_HOST | quote }}
+  DATABASE_PORT: {{ .Values.configMap.data.DATABASE_PORT | quote }}
+  DATABASE_NAME: {{ .Values.configMap.data.DATABASE_NAME | quote }}
+  USER_SERVICE_URL: {{ .Values.configMap.data.USER_SERVICE_URL | quote }}
