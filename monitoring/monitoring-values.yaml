@@ -1,0 +1,21 @@
+
+prometheus:
+  prometheusSpec:
+    retention: 5d
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+
+    additionalScrapeConfigs:
+      - job_name: "user-service"
+        metrics_path: /metrics
+        scrape_interval: 15s
+        static_configs:
+          - targets:
+              - user-service.fastapi-app.svc.cluster.local:8001
+
+      - job_name: "order-service"
+        metrics_path: /metrics
+        scrape_interval: 15s
+        static_configs:
+          - targets:
+              - order-service.fastapi-app.svc.cluster.local:8002

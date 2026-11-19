@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: sakthivel31/user-service
-  tag: latest
+  tag: v5
   pullPolicy: Always
 
 service:
@@ -69,3 +69,4 @@ autoscaling:
 
   scaleDown:
     stabilizationWindowSeconds: 30
+

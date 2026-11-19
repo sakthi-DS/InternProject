@@ -1,6 +1,6 @@
 
 # Stage 1: Builder
-FROM python:3.12-slim AS builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -21,15 +21,11 @@ COPY --from=builder /install /usr/local
 COPY app/ ./app
 
 # Python environment
-ENV PYTHONPATH=/app
-ENV PATH=/usr/local/bin:/usr/bin
+ENV PYTHONPATH=/app:/usr/local/lib/python3.11/site-packages:/usr/local/lib/python3.11/dist-packages
 
-# Expose port
+# Application port
 EXPOSE 8001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD ["python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health', timeout=3)"]
-
-# Run the application
+# Start FastAPI
 CMD ["-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+

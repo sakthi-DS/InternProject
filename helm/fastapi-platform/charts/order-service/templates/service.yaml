@@ -3,6 +3,8 @@ kind: Service
 
 metadata:
   name: order-service
+  labels:
+    app: order-service
 
 spec:
   type: {{ .Values.service.type }}

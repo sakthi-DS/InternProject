@@ -3,13 +3,15 @@ User Service - FastAPI Microservice
 Handles user registration, authentication, and profile management
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from sqlalchemy.orm import Session
-import structlog
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
-from fastapi.responses import Response
+
+import structlog
 import time
 
 from .database import engine, SessionLocal, Base
@@ -45,8 +47,21 @@ app.add_middleware(
 logger = structlog.get_logger()
 
 # Prometheus metrics
-REQUEST_COUNT = Counter('user_service_requests_total', 'Total requests', ['method', 'endpoint'])
-REQUEST_DURATION = Histogram('user_service_request_duration_seconds', 'Request duration')
+# Prometheus Metrics
+
+REQUEST_COUNT = Counter(
+    'user_service_requests_total',
+    'Total HTTP requests received by User Service',
+    ['method', 'endpoint', 'status_code']
+)
+
+REQUEST_DURATION = Histogram(
+    'user_service_request_duration_seconds',
+    'HTTP request processing duration in seconds',
+    ['method', 'endpoint'],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1,
+             0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+)
 
 # Security
 security = HTTPBearer()
@@ -80,18 +95,50 @@ async def get_current_user(
         )
     return user
 
+
+
 @app.middleware("http")
-async def add_process_time_header(request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = time.time() - start_time
-    
-    # Update metrics
-    REQUEST_COUNT.labels(method=request.method, endpoint=request.url.path).inc()
-    REQUEST_DURATION.observe(process_time)
-    
-    response.headers["X-Process-Time"] = str(process_time)
-    return response
+async def add_process_time_header(request: Request, call_next):
+
+    # Don't count Prometheus scraping requests
+    if request.url.path == "/metrics":
+        return await call_next(request)
+
+    start_time = time.perf_counter()
+
+    status_code = 500
+
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+
+        return response
+
+    finally:
+
+        process_time = time.perf_counter() - start_time
+
+        # Get the FastAPI route template
+        route = request.scope.get("route")
+
+        endpoint = (
+            route.path
+            if route is not None
+            else "unmatched"
+        )
+
+        # Count HTTP requests
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=endpoint,
+            status_code=str(status_code)
+        ).inc()
+
+        # Measure request duration
+        REQUEST_DURATION.labels(
+            method=request.method,
+            endpoint=endpoint
+        ).observe(process_time)
 
 @app.get("/health")
 async def health_check():
@@ -175,4 +222,4 @@ async def list_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

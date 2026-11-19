@@ -1,0 +1,28 @@
+
+persistence:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+grafana.ini:
+  smtp:
+    enabled: true
+    host: smtp.gmail.com:587
+    user: $__file{/etc/secrets/smtp/user}
+    password: $__file{/etc/secrets/smtp/password}
+    from_address: sakthiii9795@gmail.com
+    from_name: Grafana Alerts
+    startTLS_policy: Mandatory
+
+extraSecretMounts:
+  - name: smtp-secret
+    secretName: grafana-smtp
+    defaultMode: 0440
+    mountPath: /etc/secrets/smtp
+    readOnly: true

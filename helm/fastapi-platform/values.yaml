@@ -1,9 +1,9 @@
 user-service:
-  replicaCount: 2
+  replicaCount: 1
   image:
     repository: sakthivel31/user-service
     pullPolicy: Always
-    tag: latest
+    tag: v5
   service:
     type: ClusterIP
     port: 8001
@@ -16,7 +16,7 @@ user-service:
       cpu: 500m
       memory: 512Mi
   vpa:
-    enabled: true
+    enabled: false
     updateMode: "Recreate"
 
     minAllowed:

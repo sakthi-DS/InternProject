@@ -4,7 +4,8 @@ Order Service - FastAPI Microservice
 Handles order placement, tracking, and management
 """
 
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends, status, Request
+from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -53,16 +54,20 @@ app.add_middleware(
 logger = structlog.get_logger()
 
 
-# Prometheus metrics
+# Prometheus Metrics
+
 REQUEST_COUNT = Counter(
-    "order_service_requests_total",
-    "Total requests",
-    ["method", "endpoint"]
+    'order_service_requests_total',
+    'Total HTTP requests received by Order Service',
+    ['method', 'endpoint', 'status_code']
 )
 
 REQUEST_DURATION = Histogram(
-    "order_service_request_duration_seconds",
-    "Request duration"
+    'order_service_request_duration_seconds',
+    'HTTP request processing duration in seconds',
+    ['method', 'endpoint'],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1,
+             0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 )
 
 
@@ -121,25 +126,41 @@ async def verify_user_exists(user_id: int) -> bool:
 
 # Request processing time and metrics middleware
 @app.middleware("http")
-async def add_process_time_header(request, call_next):
+async def add_process_time_header(request: Request, call_next):
 
-    start_time = time.time()
+    if request.url.path == "/metrics":
+        return await call_next(request)
 
-    response = await call_next(request)
+    start_time = time.perf_counter()
+    status_code = 500
 
-    process_time = time.time() - start_time
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        return response
 
-    REQUEST_COUNT.labels(
-        method=request.method,
-        endpoint=request.url.path
-    ).inc()
+    finally:
 
-    REQUEST_DURATION.observe(process_time)
+        process_time = time.perf_counter() - start_time
 
-    response.headers["X-Process-Time"] = str(process_time)
+        route = request.scope.get("route")
 
-    return response
+        endpoint = (
+            route.path
+            if route is not None
+            else "unmatched"
+        )
 
+        REQUEST_COUNT.labels(
+            method=request.method,
+            endpoint=endpoint,
+            status_code=str(status_code)
+        ).inc()
+
+        REQUEST_DURATION.labels(
+            method=request.method,
+            endpoint=endpoint
+        ).observe(process_time)
 
 # Swagger documentation
 @app.get("/docs", include_in_schema=False)
