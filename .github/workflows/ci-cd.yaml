@@ -1,0 +1,118 @@
+name: FastAPI CI-CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout application repository
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # 2. Generate image tag from Git commit
+      - name: Generate image tag
+        id: image-tag
+        run: |
+          echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      # 3. Setup Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 4. Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 5. Build and push User Service
+      - name: Build and push User Service
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/user-service
+          file: ./services/user-service/Dockerfile
+          push: true
+          tags: |
+            sakthivel31/user-service:${{ steps.image-tag.outputs.tag }}
+            sakthivel31/user-service:latest
+
+      # 6. Build and push Order Service
+      - name: Build and push Order Service
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/order-service
+          file: ./services/order-service/Dockerfile
+          push: true
+          tags: |
+            sakthivel31/order-service:${{ steps.image-tag.outputs.tag }}
+            sakthivel31/order-service:latest
+
+  update-helm:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      # 7. Checkout separate Helm repository
+      - name: Checkout Helm repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.HELM_REPO }}
+          token: ${{ secrets.HELM_REPO_TOKEN }}
+          ref: main
+          path: helm-config
+
+      # 8. Install Python YAML dependency
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      # 9. Update Helm image tags
+      - name: Update Helm values
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          SHORT_TAG="${IMAGE_TAG:0:7}"
+
+          cd helm-config
+
+          python - <<'PY'
+          import yaml
+
+          path = "values.yaml"
+
+          with open(path, "r") as f:
+              values = yaml.safe_load(f)
+
+          values["user-service"]["image"]["tag"] = "${{ github.sha }}"[:7]
+          values["order-service"]["image"]["tag"] = "${{ github.sha }}"[:7]
+
+          with open(path, "w") as f:
+              yaml.safe_dump(values, f, sort_keys=False)
+
+          print("Updated both service image tags")
+          PY
+
+      # 10. Commit and push Helm changes
+      - name: Commit and push Helm changes
+        run: |
+          cd helm-config
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add values.yaml
+
+          if git diff --cached --quiet; then
+            echo "No Helm changes to commit"
+          else
+            git commit -m "Update FastAPI images to ${{ github.sha }}"
+            git push origin main
+          fi
