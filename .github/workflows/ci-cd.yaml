@@ -35,26 +35,28 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       # 5. Build and push User Service
+      
       - name: Build and push User Service
         uses: docker/build-push-action@v6
         with:
           context: ./services/user-service
           file: ./services/user-service/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            sakthivel31/user-service:${{ steps.image-tag.outputs.tag }}
-            sakthivel31/user-service:latest
+          tags: sakthivel31/user-service:${{ steps.image-tag.outputs.tag }}
+
 
       # 6. Build and push Order Service
+     
       - name: Build and push Order Service
         uses: docker/build-push-action@v6
         with:
           context: ./services/order-service
           file: ./services/order-service/Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            sakthivel31/order-service:${{ steps.image-tag.outputs.tag }}
-            sakthivel31/order-service:latest
+          tags: sakthivel31/order-service:${{ steps.image-tag.outputs.tag }}
+
 
   update-helm:
     needs: build-and-push
